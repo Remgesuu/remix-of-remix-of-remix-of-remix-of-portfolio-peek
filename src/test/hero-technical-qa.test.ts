@@ -44,9 +44,9 @@ describe('Technical QA: GLB config integrity', () => {
     }
   });
 
-  it('critical nodes (dossier, pedestalBase) are in NODE_MAP', () => {
-    expect(ALL_SEMANTIC_KEYS).toContain('dossier');
-    expect(ALL_SEMANTIC_KEYS).toContain('pedestalBase');
+  it('critical nodes (levelBase, sudo) are in NODE_MAP', () => {
+    expect(ALL_SEMANTIC_KEYS).toContain('levelBase');
+    expect(ALL_SEMANTIC_KEYS).toContain('sudo');
   });
 });
 
