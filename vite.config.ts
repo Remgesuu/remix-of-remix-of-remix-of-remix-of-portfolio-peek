@@ -22,6 +22,8 @@ export default defineConfig(() => ({
     include: ["@tanstack/react-query", "lenis", "three", "@react-three/fiber", "@react-three/drei"],
   },
   build: {
+    target: 'esnext', // Modern browsers only for better performance
+    minify: 'esbuild', // Fast minification
     rollupOptions: {
       output: {
         manualChunks(id: string) {
@@ -49,5 +51,7 @@ export default defineConfig(() => ({
     },
     cssCodeSplit: true,
     chunkSizeWarningLimit: 600,
+    sourcemap: false, // Disable sourcemaps in production for smaller bundles
+    reportCompressedSize: false, // Speed up build
   },
 }));

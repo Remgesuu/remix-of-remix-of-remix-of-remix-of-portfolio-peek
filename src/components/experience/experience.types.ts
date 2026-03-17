@@ -1,3 +1,5 @@
+import type { PerformanceTier } from '@/lib/performance';
+
 export type CursorMode = 'default' | 'hover' | 'drag' | 'hidden';
 
 /** Mutable ref-based pointer data — read without triggering re-renders */
@@ -20,6 +22,8 @@ export interface ExperienceState {
   isTouch: boolean;
   reducedMotion: boolean;
   webglAvailable: boolean;
+  /** Hardware performance tier for adaptive rendering */
+  performanceTier: PerformanceTier;
 
   /** Hero scroll section is currently in viewport */
   heroActive: boolean;

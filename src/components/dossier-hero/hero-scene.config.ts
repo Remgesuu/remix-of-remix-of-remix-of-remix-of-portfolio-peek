@@ -88,14 +88,14 @@ export const FISHEYE_CONFIG = {
   maxIntensity: 4,
 };
 
-/* ─── Pointer parallax ranges (desktop) ─── */
+/* ─── Pointer parallax ranges (desktop) - optimized for 120fps ─── */
 export const POINTER_RANGES = {
-  sceneTiltY: 0.096,
-  sceneTiltX: 0.042,
-  artifactTiltY: 0.05,
-  artifactTiltX: 0.028,
-  cameraPointerX: 0.15,
-  cameraPointerY: 0.1,
+  sceneTiltY: 0.07,      // Reduced from 0.096 - less GPU work
+  sceneTiltX: 0.035,     // Reduced from 0.042
+  artifactTiltY: 0.04,   // Reduced from 0.05
+  artifactTiltX: 0.022,  // Reduced from 0.028
+  cameraPointerX: 0.12,  // Reduced from 0.15
+  cameraPointerY: 0.08,  // Reduced from 0.1
 };
 
 /* ─── Lighting ─── */
@@ -105,7 +105,7 @@ export const LIGHTING = {
     intensity: 2.4,
     color: '#fff4e0',
     position: [3, 5, 4] as [number, number, number],
-    shadowMapSize: 512,
+    shadowMapSize: 256, // Reduced from 512 for 120fps target
     shadowBias: -0.0005,
   },
   fill: {
@@ -189,5 +189,5 @@ export const PHASE_SCENE: Record<DossierPhaseId, PhaseSceneState> = {
   },
 };
 
-/** Lerp speed for scene transitions per frame */
-export const SCENE_LERP = 0.06;
+/** Lerp speed for scene transitions per frame - slightly faster for 120fps */
+export const SCENE_LERP = 0.08;

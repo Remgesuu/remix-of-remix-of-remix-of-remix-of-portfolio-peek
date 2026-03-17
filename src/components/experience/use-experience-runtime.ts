@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CursorMode, ExperienceContextValue, ExperienceState, PointerRef } from './experience.types';
 import { useSmoothScroll } from '@/hooks/use-smooth-scroll';
+import { getPerformanceMetrics } from '@/lib/performance';
 
 /* ── Capability detection (runs once) ── */
 
@@ -40,6 +41,7 @@ const initialState: ExperienceState = {
   reducedMotion: false,
   webglAvailable: false,
   heroActive: false,
+  performanceTier: 'medium', // Default to medium, updated on mount
 };
 
 export function useExperienceRuntime(): ExperienceContextValue {
@@ -62,9 +64,10 @@ export function useExperienceRuntime(): ExperienceContextValue {
     const isTouch = detectTouch();
     const reducedMotion = detectReducedMotion();
     const webglAvailable = detectWebGL();
+    const performanceTier = getPerformanceMetrics().tier;
     reducedRef.current = reducedMotion;
 
-    setState((s) => ({ ...s, isTouch, reducedMotion, webglAvailable }));
+    setState((s) => ({ ...s, isTouch, reducedMotion, webglAvailable, performanceTier }));
 
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
     const onChange = (e: MediaQueryListEvent) => {

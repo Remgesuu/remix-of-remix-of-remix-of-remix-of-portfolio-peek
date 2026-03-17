@@ -239,10 +239,17 @@ function SceneContent({ progress, phase, localProgress, onCriticalMissing }: Sta
   const grainEffect = useMemo(() => new GrainEffect(0.008), []);
   useEffect(() => () => { grainEffect.dispose(); }, [grainEffect]);
 
+  // Frame counter for skipping expensive operations at 120fps
+  const frameCount = useRef(0);
+
   useEffect(() => { invalidate(); }, [phase, progress, localProgress, invalidate]);
 
   useFrame((state, delta) => {
     if (!loaded) return;
+
+    // Frame skipping: run expensive secondary operations every 2nd frame for 120fps target
+    frameCount.current++;
+    const isFullFrame = frameCount.current % 2 === 0;
 
     const p = pointerRef.current;
     const ptrX = isTouch ? 0.5 : p.lerpX;
@@ -286,13 +293,13 @@ function SceneContent({ progress, phase, localProgress, onCriticalMissing }: Sta
       applyPointerMotion(sceneRef, nodes, ptrX, ptrY, currentState.current.sceneTiltMultiplier, originalPositions.current);
     }
 
-    // 5. Secondary motion
-    if (!reducedMotion) {
+    // 5. Secondary motion (frame-skipped for 120fps)
+    if (!reducedMotion && isFullFrame) {
       applySecondaryMotion(nodes, state.clock.elapsedTime, originalPositions.current, ptrX, ptrY);
     }
 
-    // 6. Invalidate when needed
-    const pointerMoved = Math.abs(ptrX - prevPtr.current.x) > 0.0005 || Math.abs(ptrY - prevPtr.current.y) > 0.0005;
+    // 6. Invalidate when needed - increased threshold for 120fps
+    const pointerMoved = Math.abs(ptrX - prevPtr.current.x) > 0.002 || Math.abs(ptrY - prevPtr.current.y) > 0.002;
     if (pointerMoved || !reducedMotion) invalidate();
     prevPtr.current.x = ptrX;
     prevPtr.current.y = ptrY;
@@ -301,7 +308,7 @@ function SceneContent({ progress, phase, localProgress, onCriticalMissing }: Sta
   return (
     <>
       {import.meta.env.DEV && <Stats />}
-      <SoftShadows size={10} focus={0.5} samples={6} />
+      <SoftShadows size={8} focus={0.5} samples={4} />
       <Environment
         preset={ENVIRONMENT.preset}
         environmentIntensity={ENVIRONMENT.intensity}
