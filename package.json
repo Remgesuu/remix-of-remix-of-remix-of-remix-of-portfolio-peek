@@ -96,5 +96,8 @@
   },
   "overrides": {
     "vite": "^6.0.0"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
