@@ -281,6 +281,7 @@ function SceneContent({ progress, phase, localProgress, onCriticalMissing }: Sta
 
   return (
     <>
+      <SoftShadows size={10} focus={0.5} samples={6} />
       <Environment
         preset={ENVIRONMENT.preset}
         environmentIntensity={ENVIRONMENT.intensity}
