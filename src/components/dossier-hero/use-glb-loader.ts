@@ -89,5 +89,12 @@ export function useGLBScene(): GLBLoaderResult {
   return result;
 }
 
-// Preload for faster initial load
-useGLTF.preload(GLB_URL);
+// Deferred preload — schedule after initial paint to avoid blocking FCP
+if (typeof window !== 'undefined') {
+  const schedulePreload = () => useGLTF.preload(GLB_URL);
+  if ('requestIdleCallback' in window) {
+    (window as any).requestIdleCallback(schedulePreload);
+  } else {
+    setTimeout(schedulePreload, 100);
+  }
+}
