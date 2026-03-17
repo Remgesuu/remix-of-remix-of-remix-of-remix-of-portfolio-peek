@@ -281,6 +281,7 @@ function SceneContent({ progress, phase, localProgress, onCriticalMissing }: Sta
 
   return (
     <>
+      {import.meta.env.DEV && <Stats />}
       <SoftShadows size={10} focus={0.5} samples={6} />
       <Environment
         preset={ENVIRONMENT.preset}
