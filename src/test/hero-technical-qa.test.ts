@@ -14,6 +14,9 @@ import {
   NODE_BEHAVIOUR,
   PHASE_SCENE,
   CAMERA_DEFAULTS,
+  CAMERA_CURVE_POINTS,
+  LOOKAT_CURVE_POINTS,
+  FISHEYE_CONFIG,
   LIGHTING,
   type SemanticNodeKey,
 } from '@/components/dossier-hero/hero-scene.config';
