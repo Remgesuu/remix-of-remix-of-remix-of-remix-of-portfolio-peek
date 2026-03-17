@@ -59,14 +59,43 @@ export const CAMERA_DEFAULTS = {
   position: [0, 3, 8] as [number, number, number],
 };
 
+/* ─── Camera fly-through spline (CatmullRomCurve3 control points) ─── */
+export const CAMERA_CURVE_POINTS: [number, number, number][] = [
+  [0, 3, 8],       // front (closed)
+  [3, 2.5, 6],     // right-front
+  [5, 3, 0],       // right side
+  [3, 3.5, -4],    // right-back
+  [0, 4, -5],      // back
+  [-3, 3.5, -2],   // left-back
+  [-4, 3, 3],      // left side
+  [0, 4, 9],       // pull back high (handoff)
+];
+
+export const LOOKAT_CURVE_POINTS: [number, number, number][] = [
+  [0, 1.0, 0],
+  [0, 0.9, 0],
+  [0, 0.8, 0],
+  [0, 1.0, 0],
+  [0, 1.2, 0],
+  [0, 1.1, 0],
+  [0, 0.9, 0],
+  [0, 1.0, 0],
+];
+
+/* ─── Fisheye config ─── */
+export const FISHEYE_CONFIG = {
+  startProgress: 0.84,
+  maxIntensity: 4,
+};
+
 /* ─── Pointer parallax ranges (desktop) ─── */
 export const POINTER_RANGES = {
   sceneTiltY: 0.096,
   sceneTiltX: 0.042,
   artifactTiltY: 0.05,
   artifactTiltX: 0.028,
-  cameraPointerX: 0.02,
-  cameraPointerY: 0.015,
+  cameraPointerX: 0.15,
+  cameraPointerY: 0.1,
 };
 
 /* ─── Lighting ─── */
