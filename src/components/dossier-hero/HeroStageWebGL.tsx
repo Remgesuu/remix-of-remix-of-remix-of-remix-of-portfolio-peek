@@ -336,28 +336,46 @@ function SceneContent({ progress, phase, localProgress, onCriticalMissing }: Sta
         color={LIGHTING.rim.color}
       />
 
-      {/* Fisheye wrapper — intensity driven by scroll progress */}
-      <Fisheye zoom={Math.max(0, fisheyeIntensity.current)}>
+      {/* Scene group — wrapped in Fisheye only when active */}
+      {fisheyeIntensity.current > 0.01 ? (
+        <Fisheye zoom={fisheyeIntensity.current}>
+          <group ref={sceneRef}>
+            <group ref={heroArtifactRef}>
+              {loaded && grouped.heroArtifact.map((node, i) => (
+                <primitive key={`hero-${i}`} object={node} />
+              ))}
+            </group>
+            <group ref={supportRef}>
+              {loaded && grouped.support.map((node, i) => (
+                <primitive key={`support-${i}`} object={node} />
+              ))}
+            </group>
+            <group>
+              {loaded && grouped.atmosphere.map((node, i) => (
+                <primitive key={`atmo-${i}`} object={node} />
+              ))}
+            </group>
+          </group>
+        </Fisheye>
+      ) : (
         <group ref={sceneRef}>
           <group ref={heroArtifactRef}>
             {loaded && grouped.heroArtifact.map((node, i) => (
               <primitive key={`hero-${i}`} object={node} />
             ))}
           </group>
-
           <group ref={supportRef}>
             {loaded && grouped.support.map((node, i) => (
               <primitive key={`support-${i}`} object={node} />
             ))}
           </group>
-
           <group>
             {loaded && grouped.atmosphere.map((node, i) => (
               <primitive key={`atmo-${i}`} object={node} />
             ))}
           </group>
         </group>
-      </Fisheye>
+      )}
 
       <EffectComposer multisampling={0}>
         <Vignette darkness={0.35} offset={0.35} />
