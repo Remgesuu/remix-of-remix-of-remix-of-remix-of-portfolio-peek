@@ -7,40 +7,16 @@ const { execSync } = require('child_process');
 console.log('🔧 Starting dependency conflict resolution...\n');
 
 const projectRoot = '/vercel/share/v0-project';
-process.chdir(projectRoot);
 
-// Step 1: Remove node_modules and lock files
-console.log('📦 Removing node_modules and lock files...');
-const dirsToRemove = ['node_modules'];
-const filesToRemove = ['package-lock.json', 'pnpm-lock.yaml', 'bun.lock', 'yarn.lock'];
+// STEP 1: Update package.json FIRST (before removing anything)
+console.log('✏️ Updating package.json to fix dependencies...');
+const packagePath = path.join(projectRoot, 'package.json');
 
-dirsToRemove.forEach(dir => {
-  const fullPath = path.join(projectRoot, dir);
-  if (fs.existsSync(fullPath)) {
-    fs.rmSync(fullPath, { recursive: true, force: true });
-    console.log(`  ✓ Removed ${dir}`);
-  }
-});
-
-filesToRemove.forEach(file => {
-  const fullPath = path.join(projectRoot, file);
-  if (fs.existsSync(fullPath)) {
-    fs.unlinkSync(fullPath);
-    console.log(`  ✓ Removed ${file}`);
-  }
-});
-
-// Step 2: Clear npm cache
-console.log('\n🧹 Clearing npm cache...');
-try {
-  execSync('npm cache clean --force', { stdio: 'inherit' });
-} catch (e) {
-  console.log('  ⚠️  Cache clear had issues but continuing...');
+if (!fs.existsSync(packagePath)) {
+  console.error(`❌ package.json not found at ${packagePath}`);
+  process.exit(1);
 }
 
-// Step 3: Update package.json
-console.log('\n✏️ Updating package.json to fix dependencies...');
-const packagePath = path.join(projectRoot, 'package.json');
 const pkg = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
 
 // Remove lovable-tagger
@@ -52,10 +28,10 @@ if (pkg.devDependencies && pkg.devDependencies['lovable-tagger']) {
 // Fix vite version
 if (pkg.devDependencies && pkg.devDependencies['vite']) {
   pkg.devDependencies['vite'] = '^6.0.0';
-  console.log('  ✓ Downgraded vite to ^6.0.0');
+  console.log('  ✓ Set vite to ^6.0.0');
 }
 
-// Fix @vitejs/plugin-react version
+// Fix @vitejs/plugin-react version  
 if (pkg.devDependencies && pkg.devDependencies['@vitejs/plugin-react']) {
   pkg.devDependencies['@vitejs/plugin-react'] = '^4.3.1';
   console.log('  ✓ Updated @vitejs/plugin-react to ^4.3.1');
@@ -77,15 +53,41 @@ console.log('  ✓ Set packageManager to npm');
 
 // Write updated package.json
 fs.writeFileSync(packagePath, JSON.stringify(pkg, null, 2) + '\n');
-console.log('\n✅ package.json has been updated successfully');
+console.log('\n✅ package.json has been updated successfully\n');
 
-// Step 4: Install dependencies
-console.log('\n🚀 Installing dependencies with npm...\n');
+// STEP 2: Remove node_modules and lock files
+console.log('📦 Removing node_modules and lock files...');
+
+const toRemove = [
+  path.join(projectRoot, 'node_modules'),
+  path.join(projectRoot, 'package-lock.json'),
+  path.join(projectRoot, 'pnpm-lock.yaml'),
+  path.join(projectRoot, 'bun.lock'),
+  path.join(projectRoot, 'yarn.lock')
+];
+
+toRemove.forEach(item => {
+  if (fs.existsSync(item)) {
+    if (fs.statSync(item).isDirectory()) {
+      fs.rmSync(item, { recursive: true, force: true });
+    } else {
+      fs.unlinkSync(item);
+    }
+    console.log(`  ✓ Removed ${path.basename(item)}`);
+  }
+});
+console.log('✓ Cleaned up old dependencies\n');
+
+// STEP 3: Install dependencies
+console.log('🚀 Installing dependencies with npm and --legacy-peer-deps...\n');
 try {
-  execSync('npm install --legacy-peer-deps', { stdio: 'inherit' });
+  execSync('npm install --legacy-peer-deps', { 
+    cwd: projectRoot,
+    stdio: 'inherit' 
+  });
   console.log('\n✨ Dependency resolution complete!');
   console.log('You can now run: npm run dev');
 } catch (e) {
-  console.error('\n❌ Error during npm install. Please check the error above.');
+  console.error('\n❌ Error during npm install.');
   process.exit(1);
 }
