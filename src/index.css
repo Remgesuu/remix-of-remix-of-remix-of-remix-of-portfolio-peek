@@ -1,0 +1,137 @@
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300;1,9..40,400&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Dossier editorial palette — warm cream & deep navy */
+    --background: 40 33% 96%;
+    --foreground: 220 25% 12%;
+
+    --card: 40 25% 94%;
+    --card-foreground: 220 25% 12%;
+
+    --popover: 40 33% 96%;
+    --popover-foreground: 220 25% 12%;
+
+    --primary: 220 25% 12%;
+    --primary-foreground: 40 33% 96%;
+
+    --secondary: 35 20% 90%;
+    --secondary-foreground: 220 25% 18%;
+
+    --muted: 35 15% 91%;
+    --muted-foreground: 220 10% 46%;
+
+    --accent: 36 70% 55%;
+    --accent-foreground: 220 25% 10%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 35 18% 86%;
+    --input: 35 18% 86%;
+    --ring: 220 25% 12%;
+
+    --radius: 0.5rem;
+
+    /* Motion tokens (JS-accessible) */
+    --ease-expo-out: cubic-bezier(.16, 1, .3, 1);
+    --ease-symmetric: cubic-bezier(.87, 0, .13, 1);
+    --dur-material: 260ms;
+    --dur-spatial: 700ms;
+    --dur-page: 1200ms;
+
+    /* Dossier-specific tokens */
+    --dossier-cream: 40 33% 96%;
+    --dossier-warm: 35 25% 92%;
+    --dossier-navy: 220 25% 12%;
+    --dossier-navy-soft: 220 15% 28%;
+    --dossier-gold: 36 70% 55%;
+    --dossier-gold-muted: 36 40% 72%;
+    --dossier-whisper: 220 10% 42%;
+
+    --sidebar-background: 40 25% 94%;
+    --sidebar-foreground: 220 25% 18%;
+    --sidebar-primary: 220 25% 12%;
+    --sidebar-primary-foreground: 40 33% 96%;
+    --sidebar-accent: 35 20% 90%;
+    --sidebar-accent-foreground: 220 25% 12%;
+    --sidebar-border: 35 18% 86%;
+    --sidebar-ring: 36 70% 55%;
+  }
+
+  .dark {
+    --background: 220 25% 7%;
+    --foreground: 40 20% 90%;
+
+    --card: 220 22% 10%;
+    --card-foreground: 40 20% 90%;
+
+    --popover: 220 25% 7%;
+    --popover-foreground: 40 20% 90%;
+
+    --primary: 40 20% 90%;
+    --primary-foreground: 220 25% 7%;
+
+    --secondary: 220 18% 15%;
+    --secondary-foreground: 40 20% 85%;
+
+    --muted: 220 18% 15%;
+    --muted-foreground: 220 10% 55%;
+
+    --accent: 36 65% 50%;
+    --accent-foreground: 220 25% 7%;
+
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 220 18% 18%;
+    --input: 220 18% 18%;
+    --ring: 40 20% 90%;
+
+    --dossier-cream: 220 25% 7%;
+    --dossier-warm: 220 22% 10%;
+    --dossier-navy: 40 20% 90%;
+    --dossier-navy-soft: 40 15% 70%;
+    --dossier-gold: 36 65% 50%;
+    --dossier-gold-muted: 36 35% 40%;
+    --dossier-whisper: 220 10% 45%;
+
+    --sidebar-background: 220 22% 10%;
+    --sidebar-foreground: 40 20% 85%;
+    --sidebar-primary: 36 65% 50%;
+    --sidebar-primary-foreground: 220 25% 7%;
+    --sidebar-accent: 220 18% 15%;
+    --sidebar-accent-foreground: 40 20% 85%;
+    --sidebar-border: 220 18% 18%;
+    --sidebar-ring: 36 65% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'DM Sans', system-ui, sans-serif;
+  }
+
+  html[data-cursor-visible='true'] body,
+  html[data-cursor-visible='true'] a,
+  html[data-cursor-visible='true'] button,
+  html[data-cursor-visible='true'] [role="button"],
+  html[data-cursor-visible='true'] input,
+  html[data-cursor-visible='true'] textarea,
+  html[data-cursor-visible='true'] select {
+    cursor: none !important;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Instrument Serif', Georgia, serif;
+  }
+}

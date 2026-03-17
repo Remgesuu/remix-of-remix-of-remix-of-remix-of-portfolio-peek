@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portfolio — Creative Developer</title>
+    <meta name="description" content="Creative developer portfolio — interactive 3D experiences, design systems, and full-stack applications." />
+    <meta name="author" content="Lovable" />
+
+    <meta property="og:title" content="Portfolio — Creative Developer" />
+    <meta property="og:description" content="Interactive 3D experiences, design systems, and full-stack applications." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@Lovable" />
+    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+
+    <!-- Preconnect to critical origins -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <!-- Preload hero GLB model (LCP-critical 3D asset) -->
+    <link rel="preload" href="/hero/support-hero.glb" as="fetch" crossorigin />
+
+    <!-- DNS prefetch for analytics / CDN if used -->
+    <link rel="dns-prefetch" href="https://cdn.lovable.dev" />
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
