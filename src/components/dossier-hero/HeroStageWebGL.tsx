@@ -1,6 +1,6 @@
 import { useRef, useMemo, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Environment, SoftShadows, Stats } from '@react-three/drei';
+import { Environment, SoftShadows, Stats, Fisheye } from '@react-three/drei';
 import { EffectComposer, Vignette, BrightnessContrast, HueSaturation } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import type { DossierPhaseId } from './dossier-hero.types';
@@ -9,6 +9,9 @@ import {
   SCENE_LERP,
   POINTER_RANGES,
   CAMERA_DEFAULTS,
+  CAMERA_CURVE_POINTS,
+  LOOKAT_CURVE_POINTS,
+  FISHEYE_CONFIG,
   LIGHTING,
   ENVIRONMENT,
   NODE_BEHAVIOUR,
@@ -28,17 +31,13 @@ interface StageProps {
   onCriticalMissing?: () => void;
 }
 
-/* ─── Pre-allocated / cached constants (zero-alloc in frame loop) ─── */
+/* ─── Pre-allocated constants ─── */
 
 const PHASE_KEYS = Object.keys(PHASE_SCENE) as DossierPhaseId[];
-
-// Reusable target state object — mutated in-place by lerpState
 const _targetState: PhaseSceneState = { ...PHASE_SCENE.closed };
 
 function lerpStateInPlace(out: PhaseSceneState, a: PhaseSceneState, b: PhaseSceneState, t: number): void {
   const l = THREE.MathUtils.lerp;
-  out.cameraZ = l(a.cameraZ, b.cameraZ, t);
-  out.cameraY = l(a.cameraY, b.cameraY, t);
   out.sceneTiltMultiplier = l(a.sceneTiltMultiplier, b.sceneTiltMultiplier, t);
   out.heroArtifactY = l(a.heroArtifactY, b.heroArtifactY, t);
   out.heroArtifactScale = l(a.heroArtifactScale, b.heroArtifactScale, t);
@@ -50,34 +49,29 @@ function lerpStateInPlace(out: PhaseSceneState, a: PhaseSceneState, b: PhaseScen
 
 const INITIAL_STATE: PhaseSceneState = { ...PHASE_SCENE.closed };
 
-/* ─── Motion functions (zero per-frame allocations) ─── */
+/* ─── Node key cache ─── */
 
-// Cache node keys for iteration
 let _cachedNodeKeys: string[] | null = null;
-
 function getNodeKeys(nodes: SemanticNodes): string[] {
-  if (!_cachedNodeKeys) {
-    _cachedNodeKeys = Object.keys(nodes);
-  }
+  if (!_cachedNodeKeys) _cachedNodeKeys = Object.keys(nodes);
   return _cachedNodeKeys;
 }
 
-function applyPhaseMotion(
+/* ─── Object animation (non-camera) ─── */
+
+function applyObjectMotion(
   current: PhaseSceneState,
   target: PhaseSceneState,
   delta: number,
-  camera: THREE.Camera,
-  ptrX: number,
-  ptrY: number,
   heroArtifactRef: React.RefObject<THREE.Group | null>,
   supportRef: React.RefObject<THREE.Group | null>,
+  ptrX: number,
+  ptrY: number,
 ) {
   const lerpAmt = 1 - Math.pow(1 - SCENE_LERP, delta * 60);
   const l = THREE.MathUtils.lerp;
   const s = current;
 
-  s.cameraZ = l(s.cameraZ, target.cameraZ, lerpAmt);
-  s.cameraY = l(s.cameraY, target.cameraY, lerpAmt);
   s.sceneTiltMultiplier = l(s.sceneTiltMultiplier, target.sceneTiltMultiplier, lerpAmt);
   s.heroArtifactY = l(s.heroArtifactY, target.heroArtifactY, lerpAmt);
   s.heroArtifactScale = l(s.heroArtifactScale, target.heroArtifactScale, lerpAmt);
@@ -85,11 +79,6 @@ function applyPhaseMotion(
   s.supportSpread = l(s.supportSpread, target.supportSpread, lerpAmt);
   s.atmosphereOpacity = l(s.atmosphereOpacity, target.atmosphereOpacity, lerpAmt);
   s.orbGlow = l(s.orbGlow, target.orbGlow, lerpAmt);
-
-  const px = (ptrX - 0.5) * POINTER_RANGES.cameraPointerX;
-  const py = (ptrY - 0.5) * -POINTER_RANGES.cameraPointerY;
-  (camera as THREE.PerspectiveCamera).position.set(px, s.cameraY + py, s.cameraZ);
-  camera.lookAt(0, 0.8, 0);
 
   if (heroArtifactRef.current) {
     heroArtifactRef.current.position.y = s.heroArtifactY;
@@ -189,12 +178,31 @@ function applySecondaryMotion(
   }
 }
 
-/* ─── Scene content (lives inside Canvas) ─── */
+/* ─── Scene content ─── */
+
+// Reusable vectors for spline sampling (zero-alloc in frame loop)
+const _camPos = new THREE.Vector3();
+const _lookAtPos = new THREE.Vector3();
+const _smoothCamPos = new THREE.Vector3(0, 3, 8);
+const _smoothLookAt = new THREE.Vector3(0, 1, 0);
 
 function SceneContent({ progress, phase, localProgress, onCriticalMissing }: StageProps) {
   const { pointerRef, isTouch, reducedMotion } = useExperience();
   const { camera, scene, invalidate } = useThree();
   const { nodes, grouped, loaded, criticalMissing } = useGLBScene();
+
+  // Build camera spline curves once
+  const { cameraCurve, lookAtCurve } = useMemo(() => {
+    const camPts = CAMERA_CURVE_POINTS.map(p => new THREE.Vector3(...p));
+    const lookPts = LOOKAT_CURVE_POINTS.map(p => new THREE.Vector3(...p));
+    return {
+      cameraCurve: new THREE.CatmullRomCurve3(camPts, false, 'centripetal', 0.5),
+      lookAtCurve: new THREE.CatmullRomCurve3(lookPts, false, 'centripetal', 0.5),
+    };
+  }, []);
+
+  // Fisheye intensity state
+  const fisheyeIntensity = useRef(0);
 
   // Set scene background
   useEffect(() => {
@@ -218,31 +226,20 @@ function SceneContent({ progress, phase, localProgress, onCriticalMissing }: Sta
   const heroArtifactRef = useRef<THREE.Group>(null);
   const supportRef = useRef<THREE.Group>(null);
   const currentState = useRef<PhaseSceneState>({ ...INITIAL_STATE });
-
   const originalPositions = useRef<Map<string, THREE.Vector3>>(new Map());
 
   useEffect(() => {
     if (!loaded) return;
-    // Reset cached keys when nodes change
     _cachedNodeKeys = null;
     Object.entries(nodes).forEach(([key, node]) => {
-      if (node) {
-        originalPositions.current.set(key, node.position.clone());
-      }
+      if (node) originalPositions.current.set(key, node.position.clone());
     });
   }, [loaded, nodes]);
 
-  // Grain as postprocessing effect (no separate mesh/material)
   const grainEffect = useMemo(() => new GrainEffect(0.008), []);
+  useEffect(() => () => { grainEffect.dispose(); }, [grainEffect]);
 
-  useEffect(() => {
-    return () => { grainEffect.dispose(); };
-  }, [grainEffect]);
-
-  // Invalidate on demand when phase/progress changes
-  useEffect(() => {
-    invalidate();
-  }, [phase, progress, localProgress, invalidate]);
+  useEffect(() => { invalidate(); }, [phase, progress, localProgress, invalidate]);
 
   useFrame((state, delta) => {
     if (!loaded) return;
@@ -251,30 +248,52 @@ function SceneContent({ progress, phase, localProgress, onCriticalMissing }: Sta
     const ptrX = isTouch ? 0.5 : p.lerpX;
     const ptrY = isTouch ? 0.5 : p.lerpY;
 
-    // 1. Target from phase blend (zero-alloc)
+    // 1. Sample camera position from spline based on scroll progress
+    const t = THREE.MathUtils.clamp(progress, 0, 1);
+    cameraCurve.getPointAt(t, _camPos);
+    lookAtCurve.getPointAt(t, _lookAtPos);
+
+    // Add pointer parallax offset
+    const px = (ptrX - 0.5) * POINTER_RANGES.cameraPointerX;
+    const py = (ptrY - 0.5) * -POINTER_RANGES.cameraPointerY;
+
+    // Smooth camera movement
+    const camLerp = 1 - Math.pow(1 - 0.08, delta * 60);
+    _smoothCamPos.lerp(_camPos, camLerp);
+    _smoothLookAt.lerp(_lookAtPos, camLerp);
+
+    (camera as THREE.PerspectiveCamera).position.set(
+      _smoothCamPos.x + px,
+      _smoothCamPos.y + py,
+      _smoothCamPos.z,
+    );
+    camera.lookAt(_smoothLookAt.x, _smoothLookAt.y, _smoothLookAt.z);
+
+    // 2. Fisheye intensity ramp during handoff
+    const fisheyeTarget = progress > FISHEYE_CONFIG.startProgress
+      ? THREE.MathUtils.mapLinear(progress, FISHEYE_CONFIG.startProgress, 1, 0, FISHEYE_CONFIG.maxIntensity)
+      : 0;
+    fisheyeIntensity.current = THREE.MathUtils.lerp(fisheyeIntensity.current, fisheyeTarget, camLerp);
+
+    // 3. Object animations (phase-based, non-camera)
     const phaseIdx = PHASE_KEYS.indexOf(phase);
     const nextIdx = Math.min(phaseIdx + 1, PHASE_KEYS.length - 1);
     lerpStateInPlace(_targetState, PHASE_SCENE[phase], PHASE_SCENE[PHASE_KEYS[nextIdx]], localProgress);
+    applyObjectMotion(currentState.current, _targetState, delta, heroArtifactRef, supportRef, ptrX, ptrY);
 
-    // 2. Phase motion
-    applyPhaseMotion(currentState.current, _targetState, delta, camera, ptrX, ptrY, heroArtifactRef, supportRef);
-
-    // 3. Pointer motion (skip on touch)
+    // 4. Pointer motion
     if (!isTouch) {
       applyPointerMotion(sceneRef, nodes, ptrX, ptrY, currentState.current.sceneTiltMultiplier, originalPositions.current);
     }
 
-    // 4. Secondary motion (skip on reduced motion)
+    // 5. Secondary motion
     if (!reducedMotion) {
       applySecondaryMotion(nodes, state.clock.elapsedTime, originalPositions.current, ptrX, ptrY);
     }
 
-    // 5. Only invalidate when something actually changed
+    // 6. Invalidate when needed
     const pointerMoved = Math.abs(ptrX - prevPtr.current.x) > 0.0005 || Math.abs(ptrY - prevPtr.current.y) > 0.0005;
-    const hasSecondaryMotion = !reducedMotion;
-    if (pointerMoved || hasSecondaryMotion) {
-      invalidate();
-    }
+    if (pointerMoved || !reducedMotion) invalidate();
     prevPtr.current.x = ptrX;
     prevPtr.current.y = ptrY;
   });
@@ -317,25 +336,28 @@ function SceneContent({ progress, phase, localProgress, onCriticalMissing }: Sta
         color={LIGHTING.rim.color}
       />
 
-      <group ref={sceneRef}>
-        <group ref={heroArtifactRef}>
-          {loaded && grouped.heroArtifact.map((node, i) => (
-            <primitive key={`hero-${i}`} object={node} />
-          ))}
-        </group>
+      {/* Fisheye wrapper — intensity driven by scroll progress */}
+      <Fisheye zoom={Math.max(0, fisheyeIntensity.current)}>
+        <group ref={sceneRef}>
+          <group ref={heroArtifactRef}>
+            {loaded && grouped.heroArtifact.map((node, i) => (
+              <primitive key={`hero-${i}`} object={node} />
+            ))}
+          </group>
 
-        <group ref={supportRef}>
-          {loaded && grouped.support.map((node, i) => (
-            <primitive key={`support-${i}`} object={node} />
-          ))}
-        </group>
+          <group ref={supportRef}>
+            {loaded && grouped.support.map((node, i) => (
+              <primitive key={`support-${i}`} object={node} />
+            ))}
+          </group>
 
-        <group>
-          {loaded && grouped.atmosphere.map((node, i) => (
-            <primitive key={`atmo-${i}`} object={node} />
-          ))}
+          <group>
+            {loaded && grouped.atmosphere.map((node, i) => (
+              <primitive key={`atmo-${i}`} object={node} />
+            ))}
+          </group>
         </group>
-      </group>
+      </Fisheye>
 
       <EffectComposer multisampling={0}>
         <Vignette darkness={0.35} offset={0.35} />

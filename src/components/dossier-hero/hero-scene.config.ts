@@ -130,10 +130,8 @@ export const ENVIRONMENT = {
   sceneBackgroundDark: '#121826',
 };
 
-/* ─── Phase scene states ─── */
+/* ─── Phase scene states (object animations only — camera is spline-driven) ─── */
 export interface PhaseSceneState {
-  cameraZ: number;
-  cameraY: number;
   sceneTiltMultiplier: number;
   heroArtifactY: number;
   heroArtifactScale: number;
