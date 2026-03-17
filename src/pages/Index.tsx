@@ -27,7 +27,7 @@ const Index = () => {
       </a>
       <CursorLayer />
       <Navbar />
-      <Suspense fallback={<div className="h-screen w-full bg-background" />}>
+      <Suspense fallback={<HeroSkeleton />}>
         <DossierHero />
       </Suspense>
       <Suspense fallback={<SectionFallback />}>
