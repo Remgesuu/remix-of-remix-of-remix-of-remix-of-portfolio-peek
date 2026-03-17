@@ -72,9 +72,22 @@ describe('Technical QA: Phase config completeness', () => {
   });
 });
 
-describe('Technical QA: Camera and lighting defaults', () => {
+describe('Technical QA: Camera spline and lighting', () => {
   it('camera position is a 3-tuple', () => {
     expect(CAMERA_DEFAULTS.position).toHaveLength(3);
+  });
+
+  it('camera curve has at least 4 control points', () => {
+    expect(CAMERA_CURVE_POINTS.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('lookAt curve has same number of points as camera curve', () => {
+    expect(LOOKAT_CURVE_POINTS).toHaveLength(CAMERA_CURVE_POINTS.length);
+  });
+
+  it('fisheye config has valid start progress', () => {
+    expect(FISHEYE_CONFIG.startProgress).toBeGreaterThan(0);
+    expect(FISHEYE_CONFIG.startProgress).toBeLessThan(1);
   });
 
   it('each light has a 3-tuple position', () => {
