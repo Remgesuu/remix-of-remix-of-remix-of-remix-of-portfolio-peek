@@ -59,20 +59,30 @@ async function loadSounds() {
     const promises: Promise<void>[] = [];
 
     zip.forEach((path, file) => {
-      if (file.dir || !/\.wav$/i.test(path)) return;
-      // Extract name without extension and folder prefix
-      const name = path.replace(/^.*\//, '').replace(/\.wav$/i, '');
+      if (file.dir || !/\.(wav|mp3|ogg|webm)$/i.test(path)) return;
+      const name = path.replace(/^.*\//, '').replace(/\.(wav|mp3|ogg|webm)$/i, '');
 
       promises.push(
         file.async('arraybuffer').then(async (ab) => {
-          const audioBuffer = await ctx.decodeAudioData(ab.slice(0));
-          buffers.set(name, audioBuffer);
+          try {
+            // decodeAudioData needs a fresh copy of the buffer
+            const copy = ab.slice(0);
+            const audioBuffer = await ctx.decodeAudioData(copy);
+            buffers.set(name, audioBuffer);
+          } catch (err) {
+            console.warn(`[SoundEngine] Could not decode "${name}" (${path}), skipping:`, err);
+          }
         })
       );
     });
 
     await Promise.all(promises);
-    loaded = true;
+    loaded = buffers.size > 0;
+    if (buffers.size === 0) {
+      console.warn('[SoundEngine] No audio files could be decoded from zip. Sounds disabled.');
+    } else {
+      console.info(`[SoundEngine] Loaded ${buffers.size} sound(s):`, [...buffers.keys()]);
+    }
   } catch (e) {
     console.warn('[SoundEngine] Failed to load sounds:', e);
   } finally {
