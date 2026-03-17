@@ -17,6 +17,7 @@ import {
 } from './hero-scene.config';
 import { useGLBScene, type SemanticNodes } from './use-glb-loader';
 import { useExperience } from '../experience/ExperienceProvider';
+import { GrainEffect } from './GrainEffect';
 
 /* ─── Props ─── */
 
@@ -27,45 +28,39 @@ interface StageProps {
   onCriticalMissing?: () => void;
 }
 
-/* ─── Helpers ─── */
+/* ─── Pre-allocated / cached constants (zero-alloc in frame loop) ─── */
 
-function lerpState(a: PhaseSceneState, b: PhaseSceneState, t: number): PhaseSceneState {
+const PHASE_KEYS = Object.keys(PHASE_SCENE) as DossierPhaseId[];
+
+// Reusable target state object — mutated in-place by lerpState
+const _targetState: PhaseSceneState = { ...PHASE_SCENE.closed };
+
+function lerpStateInPlace(out: PhaseSceneState, a: PhaseSceneState, b: PhaseSceneState, t: number): void {
   const l = THREE.MathUtils.lerp;
-  return {
-    cameraZ: l(a.cameraZ, b.cameraZ, t),
-    cameraY: l(a.cameraY, b.cameraY, t),
-    sceneTiltMultiplier: l(a.sceneTiltMultiplier, b.sceneTiltMultiplier, t),
-    heroArtifactY: l(a.heroArtifactY, b.heroArtifactY, t),
-    heroArtifactScale: l(a.heroArtifactScale, b.heroArtifactScale, t),
-    supportY: l(a.supportY, b.supportY, t),
-    supportSpread: l(a.supportSpread, b.supportSpread, t),
-    atmosphereOpacity: l(a.atmosphereOpacity, b.atmosphereOpacity, t),
-    orbGlow: l(a.orbGlow, b.orbGlow, t),
-  };
+  out.cameraZ = l(a.cameraZ, b.cameraZ, t);
+  out.cameraY = l(a.cameraY, b.cameraY, t);
+  out.sceneTiltMultiplier = l(a.sceneTiltMultiplier, b.sceneTiltMultiplier, t);
+  out.heroArtifactY = l(a.heroArtifactY, b.heroArtifactY, t);
+  out.heroArtifactScale = l(a.heroArtifactScale, b.heroArtifactScale, t);
+  out.supportY = l(a.supportY, b.supportY, t);
+  out.supportSpread = l(a.supportSpread, b.supportSpread, t);
+  out.atmosphereOpacity = l(a.atmosphereOpacity, b.atmosphereOpacity, t);
+  out.orbGlow = l(a.orbGlow, b.orbGlow, t);
 }
 
 const INITIAL_STATE: PhaseSceneState = { ...PHASE_SCENE.closed };
 
-/* ─── Grain overlay shader ─── */
+/* ─── Motion functions (zero per-frame allocations) ─── */
 
-const grainVert = /* glsl */ `
-varying vec2 vUv;
-void main() {
-  vUv = uv;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-}`;
+// Cache node keys for iteration
+let _cachedNodeKeys: string[] | null = null;
 
-const grainFrag = /* glsl */ `
-uniform float uTime;
-uniform float uOpacity;
-varying vec2 vUv;
-float rand(vec2 co) { return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453); }
-void main() {
-  float n = rand(vUv * 800.0 + uTime * 3.0);
-  gl_FragColor = vec4(vec3(n), uOpacity);
-}`;
-
-/* ─── Motion functions ─── */
+function getNodeKeys(nodes: SemanticNodes): string[] {
+  if (!_cachedNodeKeys) {
+    _cachedNodeKeys = Object.keys(nodes);
+  }
+  return _cachedNodeKeys;
+}
 
 function applyPhaseMotion(
   current: PhaseSceneState,
@@ -124,12 +119,15 @@ function applyPointerMotion(
     sceneRef.current.rotation.x = (ptrY - 0.5) * -POINTER_RANGES.sceneTiltX * tiltMul;
   }
 
-  Object.entries(nodes).forEach(([key, node]) => {
-    if (!node) return;
+  const keys = getNodeKeys(nodes);
+  for (let i = 0, len = keys.length; i < len; i++) {
+    const key = keys[i];
+    const node = nodes[key as SemanticNodeKey];
+    if (!node) continue;
     const behaviour = NODE_BEHAVIOUR[key as SemanticNodeKey];
-    if (!behaviour) return;
+    if (!behaviour) continue;
     const orig = originals.get(key);
-    if (!orig) return;
+    if (!orig) continue;
 
     let xShift = 0;
     let zShift = 0;
@@ -146,7 +144,7 @@ function applyPointerMotion(
 
     node.position.x = orig.x + xShift;
     node.position.z = orig.z + zShift;
-  });
+  }
 }
 
 const orbLag = { x: 0.5, y: 0.5 };
@@ -163,12 +161,15 @@ function applySecondaryMotion(
   orbLag.x += (ptrX - orbLag.x) * ORB_LAG_FACTOR;
   orbLag.y += (ptrY - orbLag.y) * ORB_LAG_FACTOR;
 
-  Object.entries(nodes).forEach(([key, node]) => {
-    if (!node) return;
+  const keys = getNodeKeys(nodes);
+  for (let i = 0, len = keys.length; i < len; i++) {
+    const key = keys[i];
+    const node = nodes[key as SemanticNodeKey];
+    if (!node) continue;
     const behaviour = NODE_BEHAVIOUR[key as SemanticNodeKey];
-    if (!behaviour) return;
+    if (!behaviour) continue;
     const orig = originals.get(key);
-    if (!orig) return;
+    if (!orig) continue;
 
     let yOffset = 0;
     if (behaviour.float) {
@@ -185,7 +186,7 @@ function applySecondaryMotion(
     if (yOffset !== 0) {
       node.position.y = orig.y + yOffset;
     }
-  });
+  }
 }
 
 /* ─── Scene content (lives inside Canvas) ─── */
@@ -217,12 +218,13 @@ function SceneContent({ progress, phase, localProgress, onCriticalMissing }: Sta
   const heroArtifactRef = useRef<THREE.Group>(null);
   const supportRef = useRef<THREE.Group>(null);
   const currentState = useRef<PhaseSceneState>({ ...INITIAL_STATE });
-  const grainRef = useRef<THREE.ShaderMaterial>(null);
 
   const originalPositions = useRef<Map<string, THREE.Vector3>>(new Map());
 
   useEffect(() => {
     if (!loaded) return;
+    // Reset cached keys when nodes change
+    _cachedNodeKeys = null;
     Object.entries(nodes).forEach(([key, node]) => {
       if (node) {
         originalPositions.current.set(key, node.position.clone());
@@ -230,17 +232,12 @@ function SceneContent({ progress, phase, localProgress, onCriticalMissing }: Sta
     });
   }, [loaded, nodes]);
 
-  const grainMat = useMemo(() => new THREE.ShaderMaterial({
-    vertexShader: grainVert,
-    fragmentShader: grainFrag,
-    uniforms: { uTime: { value: 0 }, uOpacity: { value: 0.008 } },
-    transparent: true,
-    depthWrite: false,
-  }), []);
+  // Grain as postprocessing effect (no separate mesh/material)
+  const grainEffect = useMemo(() => new GrainEffect(0.008), []);
 
   useEffect(() => {
-    return () => { grainMat.dispose(); };
-  }, [grainMat]);
+    return () => { grainEffect.dispose(); };
+  }, [grainEffect]);
 
   // Invalidate on demand when phase/progress changes
   useEffect(() => {
@@ -254,14 +251,13 @@ function SceneContent({ progress, phase, localProgress, onCriticalMissing }: Sta
     const ptrX = isTouch ? 0.5 : p.lerpX;
     const ptrY = isTouch ? 0.5 : p.lerpY;
 
-    // 1. Target from phase blend
-    const phaseKeys = Object.keys(PHASE_SCENE) as DossierPhaseId[];
-    const phaseIdx = phaseKeys.indexOf(phase);
-    const nextIdx = Math.min(phaseIdx + 1, phaseKeys.length - 1);
-    const target = lerpState(PHASE_SCENE[phase], PHASE_SCENE[phaseKeys[nextIdx]], localProgress);
+    // 1. Target from phase blend (zero-alloc)
+    const phaseIdx = PHASE_KEYS.indexOf(phase);
+    const nextIdx = Math.min(phaseIdx + 1, PHASE_KEYS.length - 1);
+    lerpStateInPlace(_targetState, PHASE_SCENE[phase], PHASE_SCENE[PHASE_KEYS[nextIdx]], localProgress);
 
     // 2. Phase motion
-    applyPhaseMotion(currentState.current, target, delta, camera, ptrX, ptrY, heroArtifactRef, supportRef);
+    applyPhaseMotion(currentState.current, _targetState, delta, camera, ptrX, ptrY, heroArtifactRef, supportRef);
 
     // 3. Pointer motion (skip on touch)
     if (!isTouch) {
@@ -273,12 +269,7 @@ function SceneContent({ progress, phase, localProgress, onCriticalMissing }: Sta
       applySecondaryMotion(nodes, state.clock.elapsedTime, originalPositions.current, ptrX, ptrY);
     }
 
-    // 5. Grain
-    if (grainRef.current) {
-      grainRef.current.uniforms.uTime.value = state.clock.elapsedTime;
-    }
-
-    // 6. Only invalidate when something actually changed
+    // 5. Only invalidate when something actually changed
     const pointerMoved = Math.abs(ptrX - prevPtr.current.x) > 0.0005 || Math.abs(ptrY - prevPtr.current.y) > 0.0005;
     const hasSecondaryMotion = !reducedMotion;
     if (pointerMoved || hasSecondaryMotion) {
@@ -341,10 +332,6 @@ function SceneContent({ progress, phase, localProgress, onCriticalMissing }: Sta
           {loaded && grouped.atmosphere.map((node, i) => (
             <primitive key={`atmo-${i}`} object={node} />
           ))}
-          <mesh position={[0, 1, 3.5]} renderOrder={10}>
-            <planeGeometry args={[14, 10]} />
-            <primitive object={grainMat} ref={grainRef} attach="material" />
-          </mesh>
         </group>
       </group>
 
@@ -352,6 +339,7 @@ function SceneContent({ progress, phase, localProgress, onCriticalMissing }: Sta
         <Vignette darkness={0.35} offset={0.35} />
         <BrightnessContrast brightness={-0.03} contrast={0.08} />
         <HueSaturation hue={0} saturation={0.03} />
+        <primitive object={grainEffect} />
       </EffectComposer>
     </>
   );
@@ -364,7 +352,7 @@ export function HeroStageWebGL(props: StageProps) {
     <div className="absolute inset-0">
       <Canvas
         gl={{
-          antialias: true,
+          antialias: false,
           alpha: false,
           powerPreference: 'high-performance',
           toneMapping: THREE.ACESFilmicToneMapping,
