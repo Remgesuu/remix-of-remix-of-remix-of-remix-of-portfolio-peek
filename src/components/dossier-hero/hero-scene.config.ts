@@ -5,13 +5,13 @@ export const GLB_URL = '/hero/level-react-draco.glb';
 
 /* ─── Node name lookup: Blender name → semantic key ─── */
 export const NODE_MAP = {
-  Level_1: 'levelBase',
-  Level_2: 'levelDetail',
+  Level: 'levelBase',
   Sudo: 'sudo',
   SudoHead: 'sudoHead',
-  Camera: 'cameraProp',
-  Camera_Lens: 'cameraLens',
   Cactus: 'cactus',
+  'Camera.001': 'cameraProp',
+  Pyramid: 'pyramid',
+  React: 'reactLogo',
 } as const;
 
 export type SemanticNodeKey = (typeof NODE_MAP)[keyof typeof NODE_MAP];
